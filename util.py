@@ -32,17 +32,15 @@ def reply_or_edit(update, context, text):
         chat_data[update.edited_message.message_id].edit_text(text,
                                                               parse_mode=ParseMode.MARKDOWN,
                                                               disable_web_page_preview=True)
+    elif issued_reply := get_reply_id(update):
+        chat_data[update.message.message_id] = context.bot.sendMessage(update.message.chat_id, text,
+                                                                       reply_to_message_id=issued_reply,
+                                                                       parse_mode=ParseMode.MARKDOWN,
+                                                                       disable_web_page_preview=True)
     else:
-        issued_reply = get_reply_id(update)
-        if issued_reply:
-            chat_data[update.message.message_id] = context.bot.sendMessage(update.message.chat_id, text,
-                                                                           reply_to_message_id=issued_reply,
-                                                                           parse_mode=ParseMode.MARKDOWN,
-                                                                           disable_web_page_preview=True)
-        else:
-            chat_data[update.message.message_id] = update.message.reply_text(text,
-                                                                             parse_mode=ParseMode.MARKDOWN,
-                                                                             disable_web_page_preview=True)
+        chat_data[update.message.message_id] = update.message.reply_text(text,
+                                                                         parse_mode=ParseMode.MARKDOWN,
+                                                                         disable_web_page_preview=True)
 
 
 def get_text_not_in_entities(html):
@@ -95,7 +93,7 @@ def rate_limit(f):
 
 
 def truncate_str(str, max):
-    return (str[:max] + '…') if len(str) > max else str
+    return f'{str[:max]}…' if len(str) > max else str
 
 
 Issue = namedtuple('Issue', 'type, owner, repo, number, url, title, author')
@@ -151,9 +149,7 @@ class GitHubIssues:
     def pretty_format_issue(self, issue, short=False, short_with_title=False, title_max_length=15):
         # PR OwnerIfNotDefault/RepoIfNotDefault#9999: Title by Author
         # OwnerIfNotDefault/RepoIfNotDefault#9999 if short=True
-        s = (f'{"" if issue.owner == self.default_owner else issue.owner + "/"}'
-             f'{"" if issue.repo == self.default_repo else issue.repo}'
-             f'#{issue.number}')
+        s = f'{"" if issue.owner == self.default_owner else f"{issue.owner}/"}{"" if issue.repo == self.default_repo else issue.repo}#{issue.number}'
         if short:
             return s
         elif short_with_title:
@@ -163,9 +159,7 @@ class GitHubIssues:
     def pretty_format_commit(self, commit, short=False, short_with_title=False, title_max_length=15):
         # Commit OwnerIfNotDefault/RepoIfNotDefault@abcdf123456789: Title by Author
         # OwnerIfNotDefault/RepoIfNotDefault@abcdf123456789 if short=True
-        s = (f'{"" if commit.owner == self.default_owner else commit.owner + "/"}'
-             f'{"" if commit.repo == self.default_repo else commit.repo}'
-             f'@{commit.sha[:7]}')
+        s = f'{"" if commit.owner == self.default_owner else f"{commit.owner}/"}{"" if commit.repo == self.default_repo else commit.repo}@{commit.sha[:7]}'
         if short:
             return s
         elif short_with_title:

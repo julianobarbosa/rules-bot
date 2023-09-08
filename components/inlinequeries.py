@@ -32,18 +32,17 @@ def fuzzy_replacements_markdown(query, threshold=95, official_api_links=True):
     if not symbols:
         return None, None
 
-    replacements = list()
+    replacements = []
     for s in symbols:
-        # Wiki first, cause with docs you can always prepend telegram. for better precision
-        wiki = search.wiki(s.replace('_', ' '), amount=1, threshold=threshold)
-        if wiki:
+        if wiki := search.wiki(
+            s.replace('_', ' '), amount=1, threshold=threshold
+        ):
             name = wiki[0][0].split(ARROW_CHARACTER)[-1].strip()
             text = f'[{name}]({wiki[0][1]})'
             replacements.append((wiki[0][0], s, text))
             continue
 
-        doc = search.docs(s, threshold=threshold)
-        if doc:
+        if doc := search.docs(s, threshold=threshold):
             text = f'[{doc.short_name}]({doc.url})'
 
             if doc.tg_url and official_api_links:
@@ -53,7 +52,7 @@ def fuzzy_replacements_markdown(query, threshold=95, official_api_links=True):
             continue
 
         # not found
-        replacements.append((s + '❓', s, escape_markdown(s)))
+        replacements.append((f'{s}❓', s, escape_markdown(s)))
 
     result = query
     for name, symbol, text in replacements:
@@ -71,13 +70,14 @@ def unwrap(things):
     Where lists are actually dicts, tuples are actually search results,
     and numbers are Issues/PRs/Commits
     """
-    last_search = [None]
-
-    for k, candidate in reversed(things.items()):
-        if not isinstance(candidate, (Issue, Commit)):
-            last_search = candidate
-            break
-
+    last_search = next(
+        (
+            candidate
+            for k, candidate in reversed(things.items())
+            if not isinstance(candidate, (Issue, Commit))
+        ),
+        [None],
+    )
     out = [OrderedDict() for _ in last_search]
 
     for k, elem_merged in things.items():
@@ -85,11 +85,11 @@ def unwrap(things):
             for i, elem_last in enumerate(elem_merged):
                 out[i][k] = elem_last
         elif not isinstance(elem_merged, (Issue, Commit)):
-            for i in range(len(out)):
-                out[i][k] = elem_merged[0]
+            for item in out:
+                item[k] = elem_merged[0]
         else:
-            for i in range(len(out)):
-                out[i][k] = elem_merged
+            for item_ in out:
+                item_[k] = elem_merged
 
     return last_search, out
 
@@ -139,14 +139,12 @@ def inline_github(query):
         if number:
             issue = github_issues.get_issue(int(number), owner, repo)
             things[full] = issue
-        # If it's a commit
         elif sha:
             commit = github_issues.get_commit(sha, owner, repo)
             things[full] = commit
-        # If it's a search
         elif search_query:
             search_results = github_issues.search(search_query)
-            things['#' + search_query] = search_results
+            things[f'#{search_query}'] = search_results
 
     if not things:
         # We didn't find anything
@@ -163,9 +161,7 @@ def inline_github(query):
         # If we did a search
         if last_search and last_search[i]:
             # Show the search title as the title
-            title = '🔍' + github_issues.pretty_format(last_search[i],
-                                                       short_with_title=True,
-                                                       title_max_length=50)
+            title = f'🔍{github_issues.pretty_format(last_search[i], short_with_title=True, title_max_length=50)}'
         else:
             # Otherwise just use generic title
             title = 'Resolve via GitHub'
@@ -205,7 +201,7 @@ def inline_github(query):
 
 def inline_query(update: Update, context: CallbackContext, threshold=20):
     query = update.inline_query.query
-    results_list = list()
+    results_list = []
 
     if len(query) > 0:
         if query.startswith('#'):
@@ -236,8 +232,7 @@ def inline_query(update: Update, context: CallbackContext, threshold=20):
 
         # If no results so far then search wiki and docs
         if not results_list:
-            doc = search.docs(query, threshold=threshold)
-            if doc:
+            if doc := search.docs(query, threshold=threshold):
                 text = f'*{doc.short_name}*\n' \
                     f'_python-telegram-bot_ documentation for this {doc.type}:\n' \
                     f'[{doc.full_name}]({doc.url})'
@@ -250,18 +245,18 @@ def inline_query(update: Update, context: CallbackContext, threshold=20):
                     message_text=text,
                 ))
 
-            wiki_pages = search.wiki(query, amount=4, threshold=threshold)
-            if wiki_pages:
+            if wiki_pages := search.wiki(query, amount=4, threshold=threshold):
                 # Limit number of search results to maximum (-1 cause we might have added a doc above)
                 wiki_pages = wiki_pages[:49]
-                for wiki_page in wiki_pages:
-                    results_list.append(article(
+                results_list.extend(
+                    article(
                         title=f'{wiki_page[0]}',
                         description="Github wiki for python-telegram-bot",
                         message_text=f'Wiki of _python-telegram-bot_\n'
-                        f'[{wiki_page[0]}]({wiki_page[1]})'
-                    ))
-
+                        f'[{wiki_page[0]}]({wiki_page[1]})',
+                    )
+                    for wiki_page in wiki_pages
+                )
         # If no results even after searching wiki and docs
         if not results_list:
             results_list.append(article(
@@ -272,14 +267,15 @@ def inline_query(update: Update, context: CallbackContext, threshold=20):
 
     else:
         # If no query then add all wiki pages (max 50)
-        for name, link in search.all_wiki_pages()[:50]:
-            results_list.append(article(
+        results_list.extend(
+            article(
                 title=name,
                 description='Wiki of python-telegram-bot',
                 message_text=f'Wiki of _python-telegram-bot_\n'
                 f'[{escape_markdown(name)}]({link})',
-            ))
-
+            )
+            for name, link in search.all_wiki_pages()[:50]
+        )
     update.inline_query.answer(results=results_list, switch_pm_text='Help',
                                switch_pm_parameter='inline-help', cache_time=0)
 

@@ -27,8 +27,7 @@ self_chat_id = '@'  # Updated in main()
 
 
 def start(update: Update, context: CallbackContext):
-    args = context.args
-    if args:
+    if args := context.args:
         if args[0] == 'inline-help':
             inlinequery_help(update, context)
     elif update.message.chat.username not in (OFFTOPIC_USERNAME, ONTOPIC_USERNAME):
@@ -125,18 +124,17 @@ def off_on_topic(update: Update, context: CallbackContext):
     group_one = context.match.group(1)
     if chat_username == ONTOPIC_USERNAME and group_one.lower() == 'off':
         reply = update.message.reply_to_message
-        moved_notification = 'I moved this discussion to the [off-topic Group]({}).'
         if reply and reply.text:
             issued_reply = get_reply_id(update)
-
-            if reply.from_user.username:
-                name = '@' + reply.from_user.username
-            else:
-                name = reply.from_user.first_name
 
             replied_message_text = reply.text
             replied_message_id = reply.message_id
 
+            name = (
+                f'@{reply.from_user.username}'
+                if reply.from_user.username
+                else reply.from_user.first_name
+            )
             text = (f'{name} [wrote](t.me/pythontelegrambotgroup/{replied_message_id}):\n'
                     f'{replied_message_text}\n\n'
                     f'⬇️ ᴘʟᴇᴀsᴇ ᴄᴏɴᴛɪɴᴜᴇ ʜᴇʀᴇ ⬇️')
@@ -144,12 +142,14 @@ def off_on_topic(update: Update, context: CallbackContext):
             offtopic_msg = context.bot.send_message(OFFTOPIC_CHAT_ID, text, disable_web_page_preview=True,
                                                     parse_mode=ParseMode.MARKDOWN)
 
+            moved_notification = 'I moved this discussion to the [off-topic Group]({}).'
             update.message.reply_text(
-                moved_notification.format('https://telegram.me/pythontelegrambottalk/' +
-                                          str(offtopic_msg.message_id)),
+                moved_notification.format(
+                    f'https://telegram.me/pythontelegrambottalk/{str(offtopic_msg.message_id)}'
+                ),
                 disable_web_page_preview=True,
                 parse_mode=ParseMode.MARKDOWN,
-                reply_to_message_id=issued_reply
+                reply_to_message_id=issued_reply,
             )
 
         else:

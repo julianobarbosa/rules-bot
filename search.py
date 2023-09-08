@@ -10,7 +10,7 @@ from util import ARROW_CHARACTER, DEFAULT_REPO, GITHUB_URL
 
 DOCS_URL = "https://python-telegram-bot.readthedocs.io/en/stable/"
 OFFICIAL_URL = "https://core.telegram.org/bots/api"
-PROJECT_URL = urljoin(GITHUB_URL, DEFAULT_REPO + '/')
+PROJECT_URL = urljoin(GITHUB_URL, f'{DEFAULT_REPO}/')
 WIKI_URL = urljoin(PROJECT_URL, "wiki/")
 WIKI_CODE_SNIPPETS_URL = urljoin(WIKI_URL, "Code-snippets")
 EXAMPLES_URL = urljoin(PROJECT_URL, 'tree/master/examples/')
@@ -28,7 +28,7 @@ class BestHandler:
     def to_list(self, amount, threshold):
         items = sorted(self.items, key=lambda x: x[0])
         items = [item for score, item in reversed(items[-amount:]) if score > threshold]
-        return items if len(items) > 0 else None
+        return items if items else None
 
 
 class Search:
@@ -91,19 +91,17 @@ class Search:
             for name, item in items.items():
                 name_bits = name.split('.')
                 dot_split = zip(query, reversed(name_bits))
-                score = 0
-                for s, n in dot_split:
-                    score += fuzz.ratio(s, n)
+                score = sum(fuzz.ratio(s, n) for s, n in dot_split)
                 score += fuzz.ratio(query, name)
 
                 # These values are basically random :/
-                if typ == 'py:module':
-                    score *= 0.75
-                if typ == 'py:class':
-                    score *= 1.10
                 if typ == 'py:attribute':
                     score *= 0.85
 
+                elif typ == 'py:class':
+                    score *= 1.10
+                elif typ == 'py:module':
+                    score *= 0.75
                 if score > best[0]:
                     tg_url, tg_test, tg_name = '', '', ''
 
@@ -114,7 +112,7 @@ class Search:
 
                     if tg_test in self._official.keys():
                         tg_name = self._official[tg_test]
-                        tg_url = urljoin(OFFICIAL_URL, '#' + tg_name.lower())
+                        tg_url = urljoin(OFFICIAL_URL, f'#{tg_name.lower()}')
 
                     short_name = name_bits[1:]
 
